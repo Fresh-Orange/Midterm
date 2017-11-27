@@ -3,7 +3,6 @@ package com.lxc.midterm.activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.design.widget.TextInputLayout;
@@ -22,6 +21,10 @@ import com.lxc.midterm.domain.Person;
 import com.lxc.midterm.domain.SimpleResponse;
 import com.lxc.midterm.tool.PersonTool;
 import com.lxc.midterm.utils.PhotoUtils;
+
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 import java.io.File;
 import java.util.UUID;
@@ -47,36 +50,35 @@ public class AddActivity extends AppCompatActivity {
     private String head_path = null;
     private Person person;
 
-    public Handler handler = new Handler(){
-        @Override
-        public void handleMessage(Message msg) {
-            if(msg.what == 0x2){
-                SimpleResponse simpleResponse = (SimpleResponse) msg.obj;
-                if(simpleResponse != null && simpleResponse.getErr() == null){
-                    //添加成功后
-                    //设置人物主键
-                    person.setPerson_id(simpleResponse.getPerson_id());
-                    Toast.makeText(AddActivity.this,simpleResponse.getSuccess(),Toast.LENGTH_SHORT).show();
-                    Intent addIntent = new Intent(AddActivity.this, MainActivity.class);
-                    addIntent.putExtra("add",true);
-                    addIntent.putExtra("add_person", person);
-                    setResult(2, addIntent);//成功
-                    finish();
-                }else {
-                    Toast.makeText(AddActivity.this,simpleResponse.getErr(),Toast.LENGTH_SHORT).show();
-                    Intent addIntent = new Intent(AddActivity.this, MainActivity.class);
-                    addIntent.putExtra("add",true);
-                    setResult(1, addIntent);//失败
-                    finish();
-                }
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onGetMessage(Message msg){
+        if(msg.what == 0x2){
+            SimpleResponse simpleResponse = (SimpleResponse) msg.obj;
+            if(simpleResponse != null && simpleResponse.getErr() == null){
+                //添加成功后
+                //设置人物主键
+                person.setPerson_id(simpleResponse.getPerson_id());
+                Toast.makeText(AddActivity.this,simpleResponse.getSuccess(),Toast.LENGTH_SHORT).show();
+                Intent addIntent = new Intent(AddActivity.this, MainActivity.class);
+                addIntent.putExtra("add",true);
+                addIntent.putExtra("add_person", person);
+                setResult(2, addIntent);//成功
+                finish();
+            }else {
+                Toast.makeText(AddActivity.this,simpleResponse.getErr(),Toast.LENGTH_SHORT).show();
+                Intent addIntent = new Intent(AddActivity.this, MainActivity.class);
+                addIntent.putExtra("add",true);
+                setResult(1, addIntent);//失败
+                finish();
             }
-            super.handleMessage(msg);
         }
-    };
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        //注册监听
+        EventBus.getDefault().register(this);
         setContentView(R.layout.activity_add);
         PhotoUtils.imagePath = null;
         addHead = findViewById(R.id.add_head);
@@ -139,12 +141,12 @@ public class AddActivity extends AppCompatActivity {
                     if(head_path != null){
                         File file = new File(head_path);
                         if(file.exists()){
-                            PersonTool.addUpdatePerson(handler,person,file,null);
+                            PersonTool.addUpdatePerson(person,file,null);
                         }else {
-                            PersonTool.addUpdatePerson(handler,person,null,null);
+                            PersonTool.addUpdatePerson(person,null,null);
                         }
                     }else {
-                        PersonTool.addUpdatePerson(handler,person,null,null);
+                        PersonTool.addUpdatePerson(person,null,null);
                     }
                 }
             }
@@ -222,5 +224,12 @@ public class AddActivity extends AppCompatActivity {
                 PhotoUtils.showExceptionDialog(this);
             }
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        //取消监听
+        EventBus.getDefault().unregister(this);
+        super.onDestroy();
     }
 }
