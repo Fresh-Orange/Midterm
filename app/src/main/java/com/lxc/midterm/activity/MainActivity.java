@@ -3,7 +3,6 @@ package com.lxc.midterm.activity;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
@@ -26,6 +25,10 @@ import com.scwang.smartrefresh.layout.api.RefreshLayout;
 import com.scwang.smartrefresh.layout.footer.ClassicsFooter;
 import com.scwang.smartrefresh.layout.listener.OnLoadmoreListener;
 
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,25 +47,23 @@ public class MainActivity extends AppCompatActivity {
 	private InputMethodManager imm; //管理软键盘
 
 
-	private Handler handler = new Handler(){
-		@Override
-		public void handleMessage(Message msg) {
-			switch (msg.what){
-				case 0x1:{
-					List<Person>list = (List<Person>) msg.obj;
-					mPersons.addAll(list);
-					adapter.notifyDataSetChanged();
-				}
-				break;
+	@Subscribe(threadMode = ThreadMode.MAIN)
+	public void onGetMessage(Message message){
+		switch (message.what){
+			case 0x1:{
+				List<Person>list = (List<Person>) message.obj;
+				mPersons.addAll(list);
+				adapter.notifyDataSetChanged();
 			}
-			super.handleMessage(msg);
+			break;
 		}
-	};
+	}
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+		EventBus.getDefault().register(this);//订阅事件
 
 		initItems();    //初始化任务列表
 		imm =  (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -152,7 +153,7 @@ public class MainActivity extends AppCompatActivity {
 		refreshLayout.setOnLoadmoreListener(new OnLoadmoreListener() {
 			@Override
 			public void onLoadmore(RefreshLayout refreshlayout) {
-				PersonTool.getTwentyPerson(handler,pull_times,null);
+				PersonTool.getTwentyPerson(pull_times,null);
 				pull_times++;
 				refreshlayout.finishLoadmore();
 			}
@@ -195,7 +196,7 @@ public class MainActivity extends AppCompatActivity {
 		//删除、修改
 		if(data != null){
 			if (data.getBooleanExtra("isDelete",false)) {
-				PersonTool.deletePerson(handler, mPersons.get(requestCode).getPerson_id());
+				PersonTool.deletePerson(mPersons.get(requestCode).getPerson_id());
 				mPersons.clear();
 				initItems();
 				adapter.notifyDataSetChanged();
@@ -229,16 +230,16 @@ public class MainActivity extends AppCompatActivity {
 	}
 
 	private void initItems() {
-		PersonTool.getTwentyPerson(handler,0,null);
+		PersonTool.getTwentyPerson(0,null);
 	}
 
 	private void doSearch(String str) {
 		mPersons.clear();
 		if(str == null || str.equals("")){
 			//不带关键字的搜索
-			PersonTool.getTwentyPerson(handler,0,null);
+			PersonTool.getTwentyPerson(0,null);
 		}else {
-			PersonTool.getTwentyPerson(handler,0,str);
+			PersonTool.getTwentyPerson(0,str);
 		}
 	}
 
@@ -264,5 +265,12 @@ public class MainActivity extends AppCompatActivity {
 				setupUI(innerView);
 			}
 		}
+	}
+
+	@Override
+	protected void onDestroy() {
+		//取消订阅
+		super.onDestroy();
+		EventBus.getDefault().unregister(this);
 	}
 }

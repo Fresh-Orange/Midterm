@@ -5,7 +5,6 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.Message;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AlertDialog;
@@ -28,6 +27,10 @@ import com.lxc.midterm.domain.Person;
 import com.lxc.midterm.domain.SimpleResponse;
 import com.lxc.midterm.tool.PersonTool;
 import com.lxc.midterm.utils.PhotoUtils;
+
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 import java.io.File;
 
@@ -63,22 +66,21 @@ public class DetailActivity extends AppCompatActivity {
     private String head_path = null;
     private Button btn_good; //点赞按钮
 
-    private Handler handler = new Handler(){
-        @Override
-        public void handleMessage(Message msg) {
-            super.handleMessage(msg);
-            if(msg.what == 0x2 || msg.what == 0x5){
-                SimpleResponse simpleResponse = (SimpleResponse) msg.obj;
-                if(simpleResponse.getErr() == null){
-                    //修改成功
-                    Toast.makeText(DetailActivity.this,simpleResponse.getSuccess(),Toast.LENGTH_SHORT).show();
-                }
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onGetMessage(Message msg){
+        if(msg.what == 0x2 || msg.what == 0x5){
+            SimpleResponse simpleResponse = (SimpleResponse) msg.obj;
+            if(simpleResponse.getErr() == null){
+                //修改成功
+                Toast.makeText(DetailActivity.this,simpleResponse.getSuccess(),Toast.LENGTH_SHORT).show();
             }
         }
-    };
+    }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        //注册监听
+        EventBus.getDefault().register(this);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
         setContentView(R.layout.activity_detail);
         imm =  (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -213,7 +215,7 @@ public class DetailActivity extends AppCompatActivity {
                         person.setDescription(description.getText().toString());
 
                         if(head_path == null){
-                            PersonTool.addUpdatePerson(handler,person,null,null);
+                            PersonTool.addUpdatePerson(person,null,null);
                         }
                         else{
                             //设置头像url
@@ -226,7 +228,7 @@ public class DetailActivity extends AppCompatActivity {
                             person.setHead_url(head_url);
                             File file = new File(head_path);
                             if(file.exists()){
-                                PersonTool.addUpdatePerson(handler,person,file,null);
+                                PersonTool.addUpdatePerson(person,file,null);
                             }
                         }
 
@@ -288,7 +290,7 @@ public class DetailActivity extends AppCompatActivity {
         btn_good.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                PersonTool.addGood(handler,person.getPerson_id());
+                PersonTool.addGood(person.getPerson_id());
                 btn_good.setBackgroundResource(R.drawable.like);
             }
         });
@@ -362,5 +364,12 @@ public class DetailActivity extends AppCompatActivity {
                 PhotoUtils.showExceptionDialog(this);
             }
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        //取消监听
+        EventBus.getDefault().unregister(this);
     }
 }
